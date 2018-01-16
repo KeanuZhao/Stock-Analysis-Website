@@ -1,0 +1,15 @@
+{
+  "name": "Last",
+  "version": "0.0.1",
+  "dependencies": {
+    "coroutine": "latest",
+    "express": "latest",
+    "sleep": "^5.1.1",
+    "socket.io": "latest",
+    "xml2js": "latest"
+
+  },
+  "scripts": {
+    "start": "node backend.js"
+  }
+}

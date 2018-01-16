@@ -1,0 +1,44 @@
+html.md-default-theme, html, body.md-default-theme, body {
+    /*color: rgba(0,0,0,0.87);*/
+    /*background-color: rgb(0,0,0);*/
+    background-image: url("http://cs-server.usc.edu:45678/hw/hw8/images/background.png");
+}
+button.ng-scope {
+    display: none;
+}
+
+.md-virtual-repeat-scroller {
+    text-align: left;
+}
+
+md-autocomplete,md-autocomplete-wrap{
+    border-style: none;
+   border-radius: 5px;
+    box-shadow: none;
+
+
+}
+md-autocomplete md-autocomplete-wrap md-progress-linear{
+    display: none;
+}
+
+
+.fave.ng-hide-remove {
+    transform: translate(900px, 0px);
+    transform-origin: right;
+    transition: all 1s ease;
+}
+
+.fave.ng-hide-remove-active{
+    transform: translate(0px, 0px);
+}
+
+.stockDetail.ng-hide-remove{
+    transform: translate(-900px, 0px);
+    transform-origin: left;
+    transition: all 1s ease;
+}
+
+.stockDetail.ng-hide-remove-active{
+    transform: translate(0px, 0px);
+}

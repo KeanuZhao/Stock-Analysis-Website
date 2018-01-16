@@ -1,0 +1,2853 @@
+<!DOCTYPE html>
+<html lang="en"  ng-app="myapp" ng-controller="DemoCtrl as ctrl"  ng-cloak>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>HW8</title>
+    <style>
+        body {
+            background-image: url("http://cs-server.usc.edu:45678/hw/hw8/images/background.png");
+            text-align: center;
+        }
+        .alert-danger {
+            text-align: left;
+            margin-top: 20px;
+        }
+
+    </style>
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.12.4/css/bootstrap-select.min.css">
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css"
+          integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+
+    <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.3/umd/popper.min.js"-->
+    <!--integrity="sha384-vFJXuSJphROIrBnz7yo7oB41mKfc8JzQZiCq4NCceLEaO4IHwicKwpJf9c9IpFgh" crossorigin="anonymous"></script>-->
+
+    <script src="http://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"
+          integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"
+            integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+    <link href="https://gitcdn.github.io/bootstrap-toggle/2.2.2/css/bootstrap-toggle.min.css" rel="stylesheet">
+    <script src="https://gitcdn.github.io/bootstrap-toggle/2.2.2/js/bootstrap-toggle.min.js"></script>
+    <script src="https://code.highcharts.com/stock/highstock.js"></script>
+    <script src="https://code.highcharts.com/stock/modules/exporting.js"></script>
+    <link rel='stylesheet' href='mystyle.css'>
+
+    <script>
+        var addr = "http://hw8aws-env.us-east-2.elasticbeanstalk.com/";
+        var pricepic,smapic,emapic,stochpic,rsipic,adxpic,ccipic,bbandspic,macdpic;
+
+        var autoarr;
+        var html;
+        var priceflag,smaflag,emaflag,stochflag,rsiflag,adxflag,cciflag,bbandsflag,macdflag,newsflag;
+        function onSubmit() {
+            var sym = $("#input-0").val().trim();
+            $("#forward").removeAttr("disabled");
+            afterSubmit();
+            getData(sym.toUpperCase(),"price");
+            getData(sym.toUpperCase(),"sma");
+            getData(sym.toUpperCase(),"ema");
+            getData(sym.toUpperCase(),"stoch");
+            getData(sym.toUpperCase(),"rsi");
+            getData(sym.toUpperCase(),"adx");
+            getData(sym.toUpperCase(),"cci");
+            getData(sym.toUpperCase(),"bbands");
+            getData(sym.toUpperCase(),"macd");
+            getData(sym.toUpperCase(),"news");
+        }
+        function fave(symbol,price,change,percent,volume) {
+            this.symbol = symbol;
+            this.price = price;
+            this.change = change;
+            this.percent = percent;
+            this.volume = volume;
+
+        }
+        function addfave(symbol,price,change,percent,volume) {
+
+
+            var start = String(volume).length-3;
+            var end = String(volume).length;
+            var shzu =[];
+            var str = '';
+            while(start > 0){
+                var sub = String(volume).substring(start,end);
+                shzu.push("," + sub);
+                end = start;
+                start = start - 3;
+            }
+            shzu.push(String(volume).substring(0,end));
+            for (var i=shzu.length-1;i>=0;i--)
+                str+=shzu[i];
+
+            html = "<tr><td class=\"col-sm-2\"><a style='cursor: pointer' onclick='secsubmit(this.innerHTML)' ng-click='switchFave(true)'" +
+                ">"+symbol+"</a></td>" +
+                "<td id='price"+symbol+"' class=\"col-sm-2\">"+price.toFixed(2)+"</td>" +
+                (change < 0?"<td style='color:red' id='change"+symbol+"' class=\"col-md-2\">"+change.toFixed(2)+"("+percent.toFixed(2)+"%)"+"<img src='http://cs-server.usc.edu:45678/hw/hw6/images/Red_Arrow_Down.png' width='20px' height='20px' >":"<td style='color:green' id='change"+symbol+"' class=\"col-md-2\">"+change.toFixed(2)+"("+percent.toFixed(2)+"%)"+"<img src='http://cs-server.usc.edu:45678/hw/hw6/images/Green_Arrow_Up.png' width='20px' height='20px' >" )
+                +"</td>" +
+                "<td id='volume"+symbol+"' class=\"col-sm-2\">"+str+"</td>" +
+                "<td class=\"col-sm-2\"><buttton type=\"button\" class=\"jv btn btn-default \" id="+"btn"+symbol+" onclick='deleteFave(this.id)'><span class='glyphicon glyphicon-trash' aria-hidden='true'></span></buttton></td></tr>";
+
+            $("#favetable").append($.parseHTML(html));
+
+
+
+        }
+
+
+        function secsubmit(sym) {
+
+            afterSubmit();
+
+            checkStar(sym);
+            var pre = $("#input-0").val();
+            $("#input-0").val(sym);
+            $("#submit").click();
+            $("#input-0").val(pre);
+
+
+        }
+
+
+        function loadFave() {
+
+//            console.log("enter load " );
+            document.getElementById("favetable").innerHTML = ("<tr>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Symbol</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Stock Price</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Change (Change Percent)</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Volume</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\"></span></td>\n" +
+                "                        </tr>");
+
+            if(localStorage.map != null ){
+                var map = new Map(JSON.parse(localStorage.map));
+
+                if(map != null) {
+                    for (var keyy of map){
+                        var obj = (keyy[1]);
+
+
+                        addfave(obj["symbol"], obj["price"], obj["change"], obj["percent"], obj["volume"]);
+                    }
+
+
+
+                }
+            }
+
+        }
+        function deleteFave(id) {
+            //console.log("id shi: " + id.substring(3));
+            //localStorage.removeItem(id.substring(3));
+//            console.log("deleteid " + id.substring(3));
+            var map = new Map(JSON.parse(localStorage.map));
+
+            map.delete(id.substring(3));
+
+            localStorage.map = JSON.stringify(Array.from(map.entries()));
+
+            console.log("after delete: " + JSON.parse(localStorage.map));
+            loadFave();
+            if (id.substring(3) == $("#sts").html()){
+                $("#star").attr("class","glyphicon glyphicon-star-empty");
+                $("#star").removeAttr("style");
+            }
+
+
+            //console.log(obj);
+
+        }
+        function checkStar(sym){
+            if(localStorage != null) {
+
+
+                var map = new Map(JSON.parse(localStorage.map));
+
+                if (map.has(sym)) {
+                    console.log("equal ");
+                    $("#star").attr("class", "glyphicon glyphicon-star");
+                    $("#star").attr("style", "color: #FDD32F");
+                }
+            }
+//            console.log("checkstar ");
+
+        }
+        function sortFave(map) {
+            document.getElementById("favetable").innerHTML = ("<tr>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Symbol</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Stock Price</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Change (Change Percent)</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\">Volume</span></td>\n" +
+                "                            <td class=\"col-md-2\"><span style=\"font-weight: bold\"></span></td>\n" +
+                "                        </tr>");
+            if(map != null) {
+                for (var keyy of map){
+                    var obj = (keyy[1]);
+                    addfave(obj["symbol"], obj["price"], obj["change"], obj["percent"], obj["volume"]);
+                }
+
+
+
+            }
+//            for (var i=0;i<arr.length;i++){
+//                var obj = JSON.parse(arr[i]);
+//                addfave(obj["symbol"],obj["price"],obj["change"],obj["percent"],obj["volume"]);
+//            }
+        }
+        function afterProgress() {
+
+            $("#stockall").css("display","");
+
+            $("#chartcontainer").css("display","");
+
+            $("#special").css("padding-bottom","0");
+            $(".progress").css("display","none");
+            if(priceflag){
+                $("#starbtn").attr("disabled","disabled");
+                $("#fbbtn").attr("disabled","disabled");
+            }
+            else{
+                $("#starbtn").removeAttr("disabled");
+                $("#fbbtn").removeAttr("disabled");
+            }
+            checkStar($("#sts").html().trim().toUpperCase());
+//            loadFave();
+        }
+        function afterSubmit() {
+            $(".progress").css("display","");
+
+            $("#stockall").css("display","none");
+            $("#chartcontainer").css("display","none");
+            $("#star").attr("class","glyphicon glyphicon-star-empty");
+            $("#starbtn").attr("disabled","disabled");
+            $("#fbbtn").attr("disabled","disabled");
+            $("#star").removeAttr("style");
+            $("#special").css("padding-bottom","100px");
+            $(".pad").css("display","none");
+//            $("#newstabinner").css("display","none");
+            $("#historyinner").css("display","none");
+            $("#historyerr").css("display","none");
+            $("#newserr").css("display","none");
+        }
+        var count = 0;
+        var tind;
+        function timedCount() {
+            autoRefresh(autoarr);
+            tind = setTimeout("timedCount()",5000);
+        }
+        function stopCount(){
+            clearTimeout(tind);
+        }
+        function autoRefresh(arr){
+            console.log(arr);
+            for(var i=0;i<arr.length;i++){
+                console.log(arr[i]);
+                query(arr[i]);
+
+            }
+
+
+        }
+
+        function query(sym) {
+            $.ajax({
+                url: addr,
+                data: {symbol: sym, indicator: "auto"},
+                type: "GET",
+                success: function (data) {
+                    var obj = JSON.parse(data);
+                    var nPrice = parseFloat(obj["Time Series (Daily)"][obj["Meta Data"]["3. Last Refreshed"].substring(0,10)]["4. close"]).toFixed(2);
+                    var nVolume = parseInt(obj["Time Series (Daily)"][obj["Meta Data"]["3. Last Refreshed"].substring(0,10)]["5. volume"]);
+
+                    var map = new Map(JSON.parse(localStorage.map));
+
+                    var orig = map.get(sym);
+
+                    var oPrice = orig["price"];
+
+                    if(oPrice != nPrice ){
+
+                        orig["price"] = nPrice;
+                        orig["change"] = nPrice - oPrice;
+                        orig["percent"] = ((nPrice - oPrice) / oPrice * 100).toFixed(2);
+                        orig["volume"] = nVolume;
+
+                        var priceid = "price" + sym;
+                        var changeid = "change" + sym;
+                        var volumeid = "volume" + sym;
+
+                        var start = String(nVolume).length - 3;
+                        var end = String(nVolume).length;
+                        var shzu =[];
+                        var str = '';
+                        while(start > 0){
+                            var sub = String(nVolume).substring(start,end);
+                            shzu.push("," + sub);
+                            end = start;
+                            start = start - 3;
+                        }
+                        shzu.push(String(nVolume).substring(0,end));
+                        for (var i=shzu.length-1;i>=0;i--)
+                            str+=shzu[i];
+
+                        document.getElementById(priceid).innerHTML = orig["price"];
+                        if(orig["change"] < 0){
+                            document.getElementById(changeid).style.color = "red";
+                        }
+                        else{
+                            document.getElementById(changeid).style.color = "green";
+                        }
+                        document.getElementById(changeid).innerHTML = orig["change"].toFixed(2) + "(" + orig["percent"] + "%)" +
+                            (orig["percent"] < 0?"<img src='http://cs-server.usc.edu:45678/hw/hw6/images/Red_Arrow_Down.png' width='20px' height='20px' >":"<img src='http://cs-server.usc.edu:45678/hw/hw6/images/Green_Arrow_Up.png' width='20px' height='20px' >" );
+                        document.getElementById(volumeid).innerHTML = str;
+
+                        map.set(sym,orig);
+                        localStorage.map = JSON.stringify(Array.from(map.entries()));
+                        console.log("finish ");
+                    }
+                    else{
+
+                        console.log("else ");
+                    }
+                }
+            });
+        }
+        function getData(sym,id) {
+            var price,sma,ema,stoch,rsi,adx,cci,bbands,macd,news;
+
+            switch (id){
+                case "price":
+                    count++;
+                    priceflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+
+                            try {
+                                price = JSON.parse(data);
+                                //if(typeof price === "undefined")
+                                count--;
+                                //alert("price: " + price);
+                                if (count === 0) {
+                                    //                                alert(count);
+                                    afterProgress();
+                                }
+                                var pr, secPrice, pre, date;
+                                var count1 = 0;
+                                var subjson = price["Time Series (Daily)"];
+                                for (var key in subjson) {
+                                    //                                console.log("***" + key);
+                                    pre = key;
+                                    secPrice = subjson[key]["4. close"];
+                                    count1++;
+                                    if (count1 === 2)
+                                        break;
+                                }
+                                $("#sts").html(sym);
+
+                                date = price["Meta Data"]["3. Last Refreshed"].substring(0, 10);
+                                pr = price["Time Series (Daily)"][date]["4. close"];
+
+                                $("#lp").html(pr.substring(0, pr.length - 2));
+
+                                var change = pr - secPrice;
+
+                                var shang = parseFloat(((change / secPrice) * 100).toFixed(2));
+
+                                if (change < 0) {
+                                    $("#cg").css("color", "red");
+                                    $("#cg").html(change.toFixed(2) + "(" + shang + "%" + ")" + "<img src='http://cs-server.usc.edu:45678/hw/hw6/images/Red_Arrow_Down.png' " +
+                                        "width='20px' height='20px'/>");
+                                }
+                                else {
+                                    $("#cg").css("color", "green");
+                                    $("#cg").html(change.toFixed(2) + "(" + shang + "%" + ")" + "<img src='http://cs-server.usc.edu:45678/hw/hw6/images/Green_Arrow_Up.png'" +
+                                        " width='20px' height='20px'/>");
+
+                                }
+                                var ts = price["Meta Data"]["3. Last Refreshed"];
+                                if (ts.length === 10) {
+                                    $("#ts").html(ts + " " + "16:00:00 EST");
+                                }
+                                else {
+                                    $("#ts").html(ts + " EST");
+                                }
+                                $("#op").html(parseFloat(price["Time Series (Daily)"][price["Meta Data"]["3. Last Refreshed"].substring(0, 10)]
+                                    ["1. open"]).toFixed(2));
+                                $("#pc").html(parseFloat(price["Time Series (Daily)"][pre]["4. close"]).toFixed(2));
+                                $("#dr").html(parseFloat(price["Time Series (Daily)"][date]["3. low"]).toFixed(2) + " - " +
+                                    parseFloat(price["Time Series (Daily)"][date]["2. high"]).toFixed(2));
+
+                                var start = price["Time Series (Daily)"][date]["5. volume"].length - 3;
+                                var end = price["Time Series (Daily)"][date]["5. volume"].length;
+                                var shzu = [];
+                                var str = '';
+                                while (start > 0) {
+                                    var sub = price["Time Series (Daily)"][date]["5. volume"].substring(start, end);
+                                    shzu.push("," + sub);
+                                    end = start;
+                                    start = start - 3;
+                                }
+                                shzu.push(price["Time Series (Daily)"][date]["5. volume"].substring(0, end));
+                                for (var i = shzu.length - 1; i >= 0; i--)
+                                    str += shzu[i];
+                                $("#vo").html(str);
+
+                                var res = []; //volume
+                                var list = []; // price
+                                var dates = [];
+                                var count2 = 0;
+                                for (var key in subjson) {
+                                    list[count2] = (parseFloat(subjson[key]["4. close"]));
+                                    res[count2] = (parseFloat(subjson[key]["5. volume"]));
+                                    dates[count2] = (key.split("-")[1] + "/" + key.split("-")[2].substring(0, 2));
+                                    count2++;
+                                    if (count2 === 121)
+                                        break;
+                                }
+                                var minVol = Math.min.apply(null, res);
+                                var maxVol = Math.max.apply(null, res);
+                                var minClo = Math.min.apply(null, list);
+                                var maxClo = Math.max.apply(null, list);
+
+                                pricepic = {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'line',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+
+                                        text: sym + " Stock Price and Volume"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            fillColor: "#E0DEFF"
+                                        }
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    yAxis: [
+                                        {
+                                            title: {
+                                                text: "Stock Price"
+                                            },
+
+                                            min: minClo / 5,
+                                            max: maxClo
+                                        },
+                                        {
+                                            title: {
+                                                text: "Volume"
+                                            },
+                                            opposite: true,
+
+                                            max: maxVol * 2
+
+                                        }
+                                    ],
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            type: "area",
+                                            name: "Price",
+                                            data: Array.from(list).reverse(),
+                                            threshold: null,
+                                            yAxis: 0,
+                                            color: "#0000FF",
+                                            marker: {
+                                                enabled: false
+                                            },
+                                            tooltip: {
+
+                                                valueDecimals: 2
+                                            }
+
+                                        },
+                                        {
+                                            type: "column",
+                                            name: " Volume",
+                                            data: Array.from(res).reverse(),
+                                            yAxis: 1,
+                                            color: "red"
+                                        }
+                                    ]
+                                };
+
+
+                                Highcharts.chart('pricechart', {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'line',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+
+                                        text: sym + " Stock Price and Volume"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            fillColor: "#E0DEFF"
+                                        }
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    yAxis: [
+                                        {
+                                            title: {
+                                                text: "Stock Price"
+                                            },
+
+                                            min: minClo / 5,
+                                            max: maxClo
+                                        },
+                                        {
+                                            title: {
+                                                text: "Volume"
+                                            },
+                                            opposite: true,
+
+                                            max: maxVol * 2
+
+                                        }
+                                    ],
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            type: "area",
+                                            name: "Price",
+                                            data: Array.from(list).reverse(),
+                                            threshold: null,
+                                            yAxis: 0,
+                                            color: "#0000FF",
+                                            marker: {
+                                                enabled: false
+                                            },
+                                            tooltip: {
+
+                                                valueDecimals: 2
+                                            }
+
+                                        },
+                                        {
+                                            type: "column",
+                                            name: " Volume",
+                                            data: Array.from(res).reverse(),
+                                            yAxis: 1,
+                                            color: "red"
+                                        }
+                                    ]
+                                });
+//
+                                var stockdata = [];
+                                var count3 = 0;
+                                for (var key in subjson) {
+                                    var temp = [];
+
+//
+                                    temp.push(Date.parse(key));
+                                    temp.push(parseFloat(subjson[key]["4. close"]));
+
+                                    stockdata.push(temp);
+                                    count3++;
+                                    if (count1 === 1000)
+                                        break;
+                                }
+//
+
+                                Highcharts.stockChart('historyinner', {
+
+                                    chart: {
+                                        zoomType: 'x'
+                                    },
+                                    title: {
+                                        text: sym + " Stock Value"
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "Stock Value",
+                                            opposite: true
+                                        }
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>",
+                                    },
+
+                                    tooltip: {
+                                        split: false,
+                                        style: {
+                                            fontSize: "10px",
+                                            textAlign: "center"
+                                        }
+                                    },
+
+                                    rangeSelector: {
+                                        selected: 0
+                                    },
+
+                                    series: [{
+                                        name: sym + " Stock Price",
+                                        data: Array.from(stockdata).reverse(),
+                                        type: 'area',
+                                        threshold: null,
+
+                                        tooltip: {
+                                            valueDecimals: 2
+
+                                        }
+                                    }]
+                                });
+                            }
+                            catch (err){
+                                priceflag = true;
+
+                            }
+
+                            if(!priceflag){
+                                $("#pricechart").css("display","");
+                                $("#priceerr").css("display","none");
+                                $("#stockerr").css("display","none");
+                                $("#stocktable").css("display","");
+//                                $("#starbtn").removeAttr("disabled");
+//                                $("#fbbtn").removeAttr("disabled");
+                                $("#historyinner").css("display","");
+                                $("#historyerr").css("display","none");
+                            }
+                            else{  // err
+                                $("#pricechart").css("display","none");
+                                $("#priceerr").css("display","");
+                                $("#stockerr").css("display","");
+                                $("#stocktable").css("display","none");
+                                $("#starbtn").attr("disabled","disabled");
+                                $("#fbbtn").attr("disabled","disabled");
+                                $("#historyinner").css("display","none");
+                                $("#historyerr").css("display","");
+                            }
+
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "sma":
+                    smaflag = false;
+                    count++;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            sma = JSON.parse(data);
+                            console.log("sma " + sma);
+                            count--;
+                            //alert("sma: " + sma);
+                            if(count === 0){
+//                                alert(count);
+                                afterProgress();
+                            }
+                            var subjson = sma["Technical Analysis: SMA"];
+
+                            var list = []; // price
+                            var dates = [];
+                            var count2 = 0;
+                            for(var key in subjson){
+                                list[count2] = (parseFloat(subjson[key]["SMA"]));
+                                dates[count2] = (key.split("-")[1] + "/" + key.split("-")[2].substring(0,2));
+                                count2++;
+                                if(count2 === 121)
+                                    break;
+                            }
+                            if(dates.length < 10 || list.length < 10){
+                                smaflag = true;
+                                $("#smachart").css("display","none");
+                                $("#smaerr").css("display","");
+                            }
+                            else {
+                                smaflag = false;
+                                $("#smachart").css("display","");
+                                $("#smaerr").css("display","none");
+//                            console.log("sma " + list);
+//                            console.log("sma " + dates);
+                                smapic = {
+                                    chart: {
+//
+                                        type: 'spline',
+                                        zoomType: "x"
+//
+                                    },
+                                    title: {
+                                        text: "Simple Moving Average (SMA)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#789FCC'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "SMA"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(list).reverse()
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('smachart', {
+                                    chart: {
+//
+                                        type: 'spline',
+                                        zoomType: "x"
+//
+                                    },
+                                    title: {
+                                        text: "Simple Moving Average (SMA)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#789FCC'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "SMA"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(list).reverse()
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "ema":
+                    count++;
+                    emaflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            ema = JSON.parse(data);
+                            console.log("ema " + ema);
+                            count--;
+                            //alert("ema: " + ema);
+                            if(count === 0){
+
+                                afterProgress();
+                            }
+                            var subjson = ema["Technical Analysis: EMA"];
+//                            console.log("ema " +subjson);
+                            var list = []; // price
+                            var dates = [];
+                            var count2 = 0;
+                            for(var key in subjson){
+                                list[count2] = (parseFloat(subjson[key]["EMA"]));
+                                dates[count2] = (key.split("-")[1] + "/" + key.split("-")[2].substring(0,2));
+                                count2++;
+                                if(count2 === 121)
+                                    break;
+                            }
+                            if(dates.length < 10 || list.length < 10){
+                                emaflag = true;
+                                $("#emachart").css("display","none");
+                                $("#emaerr").css("display","");
+                            }
+                            else {
+                                emaflag = false;
+                                $("#emachart").css("display","");
+                                $("#emaerr").css("display","none");
+//                            console.log("ema " + list);
+//                            console.log("ema " + dates);
+                                emapic = {
+                                    chart: {
+//                                        borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                        borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Exponential Moving Average (EMA)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#FF0000'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "EMA"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(list).reverse()
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('emachart', {
+                                    chart: {
+//                                        borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                        borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Exponential Moving Average (EMA)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#FF0000'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "EMA"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(list).reverse()
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "stoch":
+                    count++;
+                    stochflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            stoch = JSON.parse(data);
+                            console.log("stoch " + stoch);
+                            count--;
+                            //alert("stoch: " + stoch);
+                            if(count === 0){
+//                                alert(count);
+                                afterProgress();
+                            }
+                            var subjson = stoch["Technical Analysis: STOCH"];
+//                            console.log("stoch " + subjson);
+                            var count2 = 0;
+                            var slowD = [];
+                            var slowK = [];
+                            var dates = [];
+                            for(var key in subjson){
+
+                                slowD[count2] = (parseFloat(subjson[key]["SlowD"]));
+                                slowK[count2] = (parseFloat(subjson[key]["SlowK"]));
+                                dates[count2] = (key.split("-")[1] + "/" + key.split("-")[2].substring(0,2));
+                                count2++;
+                                if(count2 === 121)
+                                    break;
+                            }
+                            if(dates.length < 10 || slowD.length < 10 || slowK.length < 10){
+                                stochflag = true;
+                                $("#stochchart").css("display","none");
+                                $("#stocherr").css("display","");
+                            }
+                            else {
+                                stochflag = false;
+                                $("#stochchart").css("display","");
+                                $("#stocherr").css("display","none");
+
+                                stochpic = {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Stochastic Oscillator (STOCH)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+
+                                    tooltip: {
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "STOCH"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym + " SlowK",
+                                            data: Array.from(slowK).reverse()
+//                                        marker:{
+//                                            enabled:true,
+//                                            symbol: "square",
+//                                            radius:2
+//                                        }
+                                        },
+                                        {
+                                            name: sym + " SlowD",
+                                            data: Array.from(slowD).reverse()
+
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('stochchart', {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Stochastic Oscillator (STOCH)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+
+                                    tooltip: {
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "STOCH"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym + " SlowK",
+                                            data: Array.from(slowK).reverse()
+//                                        marker:{
+//                                            enabled:true,
+//                                            symbol: "square",
+//                                            radius:2
+//                                        }
+                                        },
+                                        {
+                                            name: sym + " SlowD",
+                                            data: Array.from(slowD).reverse()
+
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "rsi":
+                    count++;
+                    rsiflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+
+                            rsi = JSON.parse(data);
+                            console.log("rsi " + rsi);
+                            count--;
+                            //alert("rsi: " + rsi);
+                            if(count === 0){
+//                                alert(count);
+                                afterProgress();
+                            }
+                            var subjson = rsi["Technical Analysis: RSI"];
+//                            console.log("rsi " + subjson);
+                            var count2 = 0;
+                            var vals = [];
+                            var dates = [];
+                            for(var key in subjson){
+
+                                vals[count2] = (parseFloat(subjson[key]["RSI"]));
+                                dates[count2] = (key.split("-")[1] + "/" + key.split("-")[2].substring(0,2));
+                                count2++;
+                                if(121 === count2)
+                                    break;
+                            }
+                            if(dates.length < 10 || vals.length < 10){
+//                                console.log("nmb");
+                                rsiflag = true;
+                                $("#rsichart").css("display","none");
+                                $("#rsierr").css("display","");
+                            }
+                            else {
+                                rsiflag = false;
+                                $("#rsichart").css("display","");
+                                $("#rsierr").css("display","none");
+                                rsipic = {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Relative Strength Index (RSI)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#FDEA20'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "RSI"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(vals).reverse()
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('rsichart', {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Relative Strength Index (RSI)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#FDEA20'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+
+                                    yAxis: {
+                                        title: {
+                                            text: "RSI"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(vals).reverse()
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "adx":
+                    count++;
+                    adxflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            adx = JSON.parse(data);
+                            console.log("adx " + adx);
+                            count--;
+                            //alert("adx: " + adx);
+                            if(count === 0){
+//                                alert(count);
+                                afterProgress();
+                            }
+                            var subjson = adx["Technical Analysis: ADX"];
+//                            console.log("adx "+ subjson);
+                            var count2 = 0;
+                            var vals = [];
+                            var dates = [];
+                            for(var key in subjson){
+                                vals[count2] = (parseFloat(subjson[key]["ADX"]));
+                                dates[count2] = (key.split("-")[1] + "/" + key.split("-")[2].substring(0,2));
+                                count2++;
+                                if(121 === count2)
+                                    break;
+                            }
+                            if(dates.length < 10 || vals.length < 10){
+                                adxflag = true;
+                                $("#adxchart").css("display","none");
+                                $("#adxerr").css("display","");
+                            }
+                            else {
+                                adxflag = false;
+                                $("#adxchart").css("display","");
+                                $("#adxerr").css("display","none");
+                                adxpic = {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Average Directional Movement Index (ADX)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#5255F5'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "ADX"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(vals).reverse()
+
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('adxchart', {
+                                    chart: {
+//                                    borderWidth: 1,
+                                        type: 'spline',
+                                        zoomType: "x"
+//                                    borderColor: '#DDDDDD'
+                                    },
+                                    title: {
+                                        text: "Average Directional Movement Index (ADX)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#5255F5'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "ADX"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(vals).reverse()
+
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "cci":
+                    count++;
+                    cciflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            cci = JSON.parse(data);
+                            console.log("cci " + cci);
+                            count--;
+                            //alert("cci: " + cci);
+                            if(count === 0){
+//                                alert(count);
+                                afterProgress();
+                            }
+                            var subjson = cci["Technical Analysis: CCI"];
+//                            console.log("cci " +subjson);
+                            var count2 = 0;
+                            var vals = [];
+                            var dates = [];
+                            for(var key in subjson){
+                                var str = key.split("-");
+                                dates[count2] = str[1]+"/"+str[2].substr(0,2);
+                                vals[count2] = parseFloat(subjson[key]["CCI"]);
+                                count2++;
+                                if(121 === count2)
+                                    break;
+                            }
+                            if(dates.length < 10 || vals.length < 10){
+                                cciflag = true;
+
+                                $("#ccichart").css("display","none");
+                                $("#ccierr").css("display","");
+
+                            }
+                            else {
+                                cciflag = false;
+                                $("#ccichart").css("display","");
+                                $("#ccierr").css("display","none");
+//                            console.log("cci " + vals);
+//                            console.log("cci " + dates);
+                                ccipic = {
+                                    chart: {
+
+                                        type: 'spline',
+                                        zoomType: "x"
+
+                                    },
+                                    title: {
+                                        text: "Commodity Channel Index (CCI)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#22FF08'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "CCI"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(vals).reverse()
+
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('ccichart', {
+                                    chart: {
+
+                                        type: 'spline',
+                                        zoomType: "x"
+
+                                    },
+                                    title: {
+                                        text: "Commodity Channel Index (CCI)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+                                    plotOptions: {
+                                        series: {
+                                            color: '#22FF08'
+                                        }
+                                    },
+                                    tooltip: {
+
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "CCI"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(vals).reverse()
+
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "bbands":
+                    count++;
+                    bbandsflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            bbands = JSON.parse(data);
+                            console.log("bbands " + bbands);
+                            count--;
+                            //alert("bbands: " + bbands);
+                            if(count === 0){
+//                                alert(count);
+                                afterProgress();
+                            }
+                            var subjson = bbands["Technical Analysis: BBANDS"];
+//                            console.log("bbands " + subjson);
+                            var count2 = 0;
+                            var RUB = [];
+                            var RMB = [];
+                            var RLB = [];
+                            var dates = [];
+                            for(var key in subjson){
+                                var str = key.split("-");
+                                dates[count2] = str[1]+"/"+str[2].substr(0,2);
+                                RUB[count2] = parseFloat(subjson[key]["Real Upper Band"]);
+                                RMB[count2] = parseFloat(subjson[key]["Real Middle Band"]);
+                                RLB[count2] = parseFloat(subjson[key]["Real Lower Band"]);
+
+                                count2++;
+                                if(121 === count2)
+                                    break;
+                            }
+                            if(dates.length < 10 ){
+                                bbandsflag = true;
+                                $("#bbandschart").css("display","none");
+                                $("#bbandserr").css("display","");
+                            }
+                            else {
+                                bbandsflag = false;
+                                $("#bbandschart").css("display","");
+                                $("#bbandserr").css("display","none");
+                                bbandspic = {
+                                    chart: {
+                                        type: 'spline',
+                                        zoomType: "x"
+                                    },
+                                    title: {
+                                        text: "Bollinger Bands (BBANDS)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+
+                                    tooltip: {
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "BBANDS"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym + " Real Upper Band",
+                                            data: Array.from(RUB).reverse()
+
+                                        },
+                                        {
+                                            name: sym + " Real Middle Band",
+                                            data: Array.from(RMB).reverse()
+
+                                        },
+                                        {
+                                            name: sym + " Real Lower Band",
+                                            data: Array.from(RLB).reverse()
+
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('bbandschart', {
+                                    chart: {
+                                        type: 'spline',
+                                        zoomType: "x"
+                                    },
+                                    title: {
+                                        text: "Bollinger Bands (BBANDS)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+
+                                    tooltip: {
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "BBANDS"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym + " Real Upper Band",
+                                            data: Array.from(RUB).reverse()
+
+                                        },
+                                        {
+                                            name: sym + " Real Middle Band",
+                                            data: Array.from(RMB).reverse()
+
+                                        },
+                                        {
+                                            name: sym + " Real Lower Band",
+                                            data: Array.from(RLB).reverse()
+
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "macd":
+                    count++;
+                    macdflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            macd = JSON.parse(data);
+                            console.log("macd :" + macd);
+                            count--;
+                            //alert("macd: " + macd);
+                            if(count === 0){
+//                                alert(count);
+                                afterProgress();
+                            }
+                            var subjson = macd["Technical Analysis: MACD"];
+//                            console.log("%^&& " + subjson);
+//                            console.log("macd " + subjson);
+                            var count2 = 0;
+                            var MS = [];
+                            var MH = [];
+                            var M = [];
+                            var dates = [];
+                            for(var key in subjson){
+                                var str = key.split("-");
+                                dates[count2] = str[1]+"/"+str[2].substr(0,2);
+                                MS[count2] = parseFloat(subjson[key]["MACD_Signal"]);
+                                MH[count2] = parseFloat(subjson[key]["MACD_Hist"]);
+                                M[count2] = parseFloat(subjson[key]["MACD"]);
+
+                                count2++;
+                                if(121 === count2)
+                                    break;
+                            }
+//                            console.log(dates);
+                            if(dates.length < 10 ){
+                                macdflag = true;
+                                $("#macdchart").css("display","none");
+                                $("#macderr").css("display","");
+                            }
+                            else {
+                                macdflag = false;
+                                $("#macdchart").css("display","");
+                                $("#macderr").css("display","none");
+                                macdpic = {
+                                    chart: {
+                                        type: 'spline',
+                                        zoomType: "x"
+                                    },
+                                    title: {
+                                        text: "Moving Average Convergence/Divergence (MACD)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+
+                                    tooltip: {
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "MACD"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(M).reverse()
+                                        },
+                                        {
+                                            name: sym + " MACD_Hist",
+                                            data: Array.from(MH).reverse()
+
+                                        },
+                                        {
+                                            name: sym + " MACD_Signal",
+                                            data: Array.from(MS).reverse()
+
+                                        }
+                                    ]
+                                };
+                                Highcharts.chart('macdchart', {
+                                    chart: {
+                                        type: 'spline',
+                                        zoomType: "x"
+                                    },
+                                    title: {
+                                        text: "Moving Average Convergence/Divergence (MACD)"
+                                    },
+                                    subtitle: {
+                                        useHTML: true,
+                                        text: "<a style='text-decoration: none' target='_blank' href='https://www.alphavantage.co/'>Source: Alpha Vantage</a>"
+                                    },
+
+                                    tooltip: {
+                                        valueDecimals: 4
+                                    },
+                                    yAxis: {
+                                        title: {
+                                            text: "MACD"
+                                        }
+                                    },
+                                    xAxis: {
+                                        categories: Array.from(dates).reverse(),
+                                        tickInterval: 5
+                                    },
+                                    series: [
+                                        {
+                                            name: sym,
+                                            data: Array.from(M).reverse()
+                                        },
+                                        {
+                                            name: sym + " MACD_Hist",
+                                            data: Array.from(MH).reverse()
+
+                                        },
+                                        {
+                                            name: sym + " MACD_Signal",
+                                            data: Array.from(MS).reverse()
+
+                                        }
+                                    ]
+                                });
+                            }
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+                    break;
+                case "news":
+                    count++;
+                    newsflag = false;
+                    $.ajax({
+                        url: addr,
+                        data: {symbol: sym, indicator: id},
+                        type: "GET",
+                        success: function (data) {
+                            try{
+                                $("#newstabinner").html("");
+                                count--;
+
+                                var xmlobj = data;
+                                if(count === 0){
+
+                                    afterProgress();
+                                }
+                                //console.log("xml :   " + xmlobj);
+                                var subxml = xmlobj["rss"]["channel"][0]["item"];
+
+                                var num = 0;
+
+                                for(var i=0;i<subxml.length;i++) {
+
+                                    if(subxml[i]["link"][0].indexOf('article') >= 0) {
+
+                                        $("#newstabinner").append("<div style='text-align: left;margin-left: 10px;margin-right: 10px' class='well'> "  +
+                                            "<h4 style=\"padding-bottom: 20px\"><a target='_blank' href='"+ subxml[i]["link"][0] +"'>" + subxml[i]["title"] + "</a> </h4>\n" +
+                                            "<label>Author: " + subxml[i]["sa:author_name"] + "</label><br>\n" +
+                                            "<label>" +
+                                            (subxml[i]["pubDate"][0].substring(subxml[i]["pubDate"][0].length - 5, subxml[i]["pubDate"][0].length) == "-0400"?("Date: " + subxml[i]["pubDate"][0].substring(0, subxml[i]["pubDate"][0].length - 5) + " EDT"):("Date: " + subxml[i]["pubDate"][0].substring(0, subxml[i]["pubDate"][0].length - 5) + " EST")) +
+                                            "</label></div>");
+                                        num++;
+                                    }
+
+                                    if (num === 5)
+                                        break;
+                                }
+                            }
+                            catch(err){
+                                newsflag = true;
+                            }
+                            if(newsflag){ //err
+                                $("#newstabinner").css("display","none");
+                                $("#newserr").css("display","");
+                            }
+                            else{
+                                $("#newstabinner").css("display","");
+                                $("#newserr").css("display","none");
+                            }
+
+                        },
+                        error: function (responseTxt, statusTxt, xhr) {
+
+                        }
+                    });
+
+                    break;
+            }
+
+        }
+        function judgeBlur() {
+            if($("#input-0").val().match(/^\s*$/)){
+                //isValid = false;
+                $("#input-div").addClass("has-error");
+                $("#input-0").css("border-color","#a94442");
+                $("#warning").html("Please enter a stock ticker symbol.");
+                $(".jv").attr("disabled","disabled");
+            }
+
+
+            else{
+//                isValid = true;
+                $("#input-div").removeClass("has-error");
+                $("#warning").html("");
+                $("#input-0").css("border-color","#C1C1C1");
+                $(".jv").removeAttr("disabled");
+            }
+        }
+
+        function judgeFocus() {
+            if ($("#input-0").css("border-color") == "#C1C1C1"){
+                $("#input-0").css("border-color","#559EE4");
+            }
+
+
+        }
+
+        function judgeUp() {
+            if($("#input-0").val().match(/^\s*$/)){
+//                isValid = false;
+                $("#input-div").addClass("has-error");
+                $("#input-0").css("border-color","#a94442");
+                $("#warning").html("Please enter a stock ticker symbol.");
+                $(".jv").attr("disabled","disabled");
+            }
+            else{
+//                isValid = true;
+                $("#input-div").removeClass("has-error");
+                $("#warning").html("");
+                $("#input-0").css("border-color","#C1C1C1");
+                $(".jv").removeAttr("disabled");
+            }
+        }
+        function changeStar(){
+            var map;
+            var att = $("#star").attr("class");
+            if(att === "glyphicon glyphicon-star-empty"){ // change to yellow
+                $("#star").attr("class","glyphicon glyphicon-star");
+                $("#star").attr("style","color: #FDD32F");
+                if(localStorage.map != null){
+                    map = new Map(JSON.parse(localStorage.map));
+                    console.log("you");
+                }
+
+                else{
+                    map = new Map();
+                    console.log("wu");
+                }
+
+
+
+
+                var sell = $("#vo").html().split(",");
+                var result = '';
+                for (var i = 0;i<sell.length;i++)
+                    result += sell[i];
+
+                var stock = new fave($("#sts").html(),
+                    parseFloat($("#lp").html()),
+                    parseFloat($("#cg").html().split('(')[0]),
+                    parseFloat($("#cg").html().split('(')[1].split('%')[0]),
+                    parseInt(result));
+
+                map.set($("#sts").html(),stock);
+
+
+                localStorage.map = JSON.stringify(Array.from(map.entries()));
+//                console.log("map1 " + new Map(JSON.parse(localStorage.map)));
+//                console.log("#$%#$%#%" + Array.from(map.entries()));
+                loadFave();
+
+                //addfave(stock.symbol,stock.price,stock.change,stock.percent,stock.volume);
+
+
+
+            }
+            else{ // change to empty
+                $("#star").attr("class","glyphicon glyphicon-star-empty");
+                $("#star").removeAttr("style");
+                map = new Map(JSON.parse(localStorage.map));
+
+
+                map.delete($("#sts").html());
+
+                localStorage.map = JSON.stringify(Array.from(map.entries()));
+
+                loadFave();
+
+
+//                console.log("map4 " + new Map(JSON.parse(localStorage.map)));
+            }
+            //alert(att);
+        }
+        function selectChange() {
+            var v1 = $("#select1 option:selected");
+            var v2 = $("#select2 option:selected");
+            var map = new Map(JSON.parse(localStorage.map));
+            if(v1.html() === "Default"){
+                $("#select2").attr("disabled","disabled");
+                loadFave();
+            }
+            else{
+                $("#select2").removeAttr("disabled");
+                if(v1.html() === "Symbol"){
+
+                    if(v2.html() === "Ascending"){
+                        console.log("11");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return x[1]["symbol"].localeCompare(y[1]["symbol"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                    else{
+                        console.log("12");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return y[1]["symbol"].localeCompare(x[1]["symbol"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                }
+                if(v1.html() === "Price"){
+
+                    if(v2.html() === "Ascending"){
+                        console.log("21");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return x[1]["price"]-(y[1]["price"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                    else{
+                        console.log("22");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return y[1]["price"]-(x[1]["price"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                }
+                if(v1.html() === "Change"){
+                    if(v2.html() === "Ascending"){
+                        console.log("31");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return x[1]["change"]-(y[1]["change"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                    else{
+                        console.log("32");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return y[1]["change"]-(x[1]["change"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                }
+                if(v1.html() === "Change Percent"){
+                    if(v2.html() === "Ascending"){
+                        console.log("41");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return x[1]["percent"]-(y[1]["percent"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                    else{
+                        console.log("42");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return y[1]["percent"]-(x[1]["percent"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                }
+                if(v1.html() === "Volume"){
+                    if(v2.html() === "Ascending"){
+                        console.log("51");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return x[1]["volume"]-(y[1]["volume"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                    else{
+                        console.log("52");
+                        var arr = [];
+                        for(var x of map){
+                            arr.push(x);
+                        }
+                        arr.sort(function(x,y){
+                            return y[1]["volume"]-(x[1]["volume"]);
+                        });
+                        var sorted = new Map(arr);
+                        sortFave(sorted);
+                    }
+                }
+            }
+        }
+
+
+
+
+    </script>
+
+    <script>
+        window.fbAsyncInit = function() {
+            FB.init({
+                appId      : "136909166965424",
+                cookie     : true,
+                xfbml      : true,
+                version    : "v2.7"
+            });
+
+            FB.AppEvents.logPageView();
+
+        };
+
+        (function(d, s, id){
+            var js, fjs = d.getElementsByTagName(s)[0];
+            if (d.getElementById(id)) {return;}
+            js = d.createElement(s); js.id = id;
+            js.src = "https://connect.facebook.net/en_US/sdk.js";
+            fjs.parentNode.insertBefore(js, fjs);
+        }(document, 'script', 'facebook-jssdk'));
+    </script>
+
+</head>
+<body id="contrldiv" >
+<!-- Angular Material requires Angular.js Libraries -->
+<link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.css">
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
+
+
+
+<!-- Angular Material Library -->
+<!--<script src="script.js"></script>-->
+<script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
+<script>
+
+
+    $(document).ready(function () {
+//            localStorage.clear();
+        loadFave();
+
+        $("#submit").attr("disabled","disabled");
+        $("#forward").attr("disabled","disabled");
+        $("#clear").click(function () {
+            $("#input-0").val("");
+            $("#submit").attr("disabled","disabled");
+            $("#clear").attr("disabled","disabled");
+        });
+        $("#fbbtn").click(function () {
+
+            var pic = {};
+
+            if($("#price").attr("class") == "active")
+                pic.options = JSON.stringify(pricepic);
+            if($("#sma").attr("class") == "active")
+                pic.options = JSON.stringify(smapic);
+            if($("#ema").attr("class") == "active")
+                pic.options = JSON.stringify(emapic);
+            if($("#stoch").attr("class") == "active")
+                pic.options = JSON.stringify(stochpic);
+            if($("#rsi").attr("class") == "active")
+                pic.options = JSON.stringify(rsipic);
+            if($("#adx").attr("class") == "active")
+                pic.options = JSON.stringify(adxpic);
+            if($("#cci").attr("class") == "active")
+                pic.options = JSON.stringify(ccipic);
+            if($("#bbands").attr("class") == "active")
+                pic.options = JSON.stringify(bbandspic);
+            if($("#macd").attr("class") == "active")
+                pic.options = JSON.stringify(macdpic);
+            pic.type = 'image/png';
+            pic.async = true;
+
+            $.ajax({
+                type: 'POST',
+                url: 'http://export.highcharts.com/',
+                data: pic,
+                success: function (data) {
+                    FB.ui({
+                        method: 'feed',
+                        link: 'https://export.highcharts.com/' + data,
+                        caption: 'An example caption',
+                    }, function(response){});
+                }
+            });
+
+
+        });
+
+
+
+        $("#input-0").css("border","solid");
+        $("#input-0").css("border-width","0.5px");
+        $("#input-0").css("border-color","#C1C1C1");
+//            $(".md-virtual-repeat-scroller").css("overflow","hidden");
+
+        $("#input-0").addClass("form-control");
+        $("#input-0").attr("onblur","judgeBlur()");
+        $("#input-0").attr("onkeyup","judgeUp()");
+        $("#input-0").attr("onfocus","judgeFocus()");
+        $(".md-whiteframe-1dp,.md-whiteframe-z1").css("box-shadow","none");
+        var v = $("#select1 option:selected");
+        //alert(v.html());
+        if(v.html() === "Default"){
+            $("#select2").attr("disabled","disabled");
+        }
+
+        $("#submit").click(function () {
+            onSubmit();
+        });
+
+        $("#refresh").click(function () {
+            var map = new Map(JSON.parse(localStorage.map));
+            var arr = [];
+
+            map.forEach(function(v,k,m){
+                arr.push(k);
+            });
+            for(var i=0;i<arr.length;i++){
+                console.log(arr[i]);
+                query(arr[i]);
+
+            }
+
+        });
+
+        $("#auto").change(function () {
+
+
+            if ($(this).is(":checked")){
+
+                var map = new Map(JSON.parse(localStorage.map));
+                autoarr = [];
+
+                map.forEach(function(v,k,m){
+                    autoarr.push(k);
+                });
+
+                timedCount();
+
+                $(this).removeAttr("checked");
+            }
+            else{
+
+                stopCount();
+
+                $(this).attr("checked");
+            }
+        });
+
+        $("#inds li").click(function () {
+            if(this.id === "price"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#sma").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","none");
+                if(priceflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "sma"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","none");
+                if(smaflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "ema"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#sma").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","none");
+                if(emaflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "stoch"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#sma").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","none");
+                if(stochflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "rsi"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#sma").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","none");
+                if(rsiflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "adx"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#sma").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","none");
+                if(adxflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "cci"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#sma").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","none");
+                if(cciflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "bbands"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#sma").removeClass("active");
+                $("#macd").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","");
+                $("#macdall").css("display","none");
+                if(bbandsflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+            if(this.id === "macd"){
+                //alert("Click list." + this.id);
+                $(this).addClass("active");
+                $("#price").removeClass("active");
+                $("#ema").removeClass("active");
+                $("#stoch").removeClass("active");
+                $("#rsi").removeClass("active");
+                $("#adx").removeClass("active");
+                $("#cci").removeClass("active");
+                $("#bbands").removeClass("active");
+                $("#sma").removeClass("active");
+
+                $("#priceall").css("display","none");
+                $("#smaall").css("display","none");
+                $("#emaall").css("display","none");
+                $("#stochall").css("display","none");
+                $("#rsiall").css("display","none");
+                $("#adxall").css("display","none");
+                $("#cciall").css("display","none");
+                $("#bbandsall").css("display","none");
+                $("#macdall").css("display","");
+                if(macdflag){
+                    $("#fbbtn").attr("disabled","disabled");
+                }
+                else{
+                    $("#fbbtn").removeAttr("disabled");
+                }
+            }
+
+        })
+    });
+
+    angular.module('myapp', ['ngMaterial']).controller('DemoCtrl', function ($http, $scope,$compile){
+        $scope.hideFave = false;
+        $scope.hideDetails = true;
+//            htmlelement = $compile(angular.element(html))($scope);
+        $scope.switchFave = function(flag) {
+            $scope.hideFave = flag;
+            if(!flag){
+                $("#forward").attr("disabled","disabled");
+            }
+        };
+
+
+        this.querySearch = function (searchText) {
+            //return $scope.data;
+            return $http({
+                method : "GET",
+                url : addr,
+                params: {
+                    symbol : searchText,
+                    indicator:"xxx"
+                }
+            }).then(function success(response){
+
+                var len = response.data["length"];
+                var data = [];
+                for(var i=0;i<len;i++){
+                    data[i] = {
+                        "name" : response.data[i]["Symbol"] + " - " +  response.data[i]["Name"] + "(" + response.data[i]["Exchange"] + ")",
+                        "value" : response.data[i]["Symbol"]
+                    }
+                }
+                return data;
+
+            },function myError(response){
+                console.log("myError Function ");
+            });
+        }
+
+    });
+
+
+
+</script>
+<!--<div class="search_div">-->
+
+<div class="container" style="background-color: white;margin-top: 10px;border-radius: 7px;padding-bottom: 50px"  >
+    <div style="padding-top: 20px">
+        <p style="font-weight: bold">Stock Market Search</p>
+    </div>
+    <div class="row" >
+        <form class="form-inline">
+            <div class="col-md-3">
+                <span style="font-weight: bold">Enter Stock Ticker Symbol:<span style="color: red">*</span></span>
+            </div>
+
+            <div id="input-div"  class="col-md-6" >
+                <!--<div class="form-group">-->
+                <!--<div   >-->
+
+                <md-autocomplete
+                        required
+                        ng-disabled="ctrl.isDisabled"
+                        md-input-name = "autocomplete"
+                        md-selected-item="ctrl.selectedItem"
+                        md-search-text-change="ctrl.searchTextChange(ctrl.searchText)"
+                        md-search-text="ctrl.searchText"
+                        md-selected-item-change="ctrl.selectedItemChange(item)"
+                        md-items="item in ctrl.querySearch(ctrl.searchText)"
+                        md-item-text="item.value"
+                        md-min-length="0"
+                        md-menu-class="autocomplete-custom-template">
+                    <md-item-template>
+                        {{item.name}}
+                    </md-item-template>
+                </md-autocomplete>
+                <!--</div>-->
+
+                <br>
+                <div id="warning" style="text-align: left"></div>
+
+            </div>
+
+            <div class="col-md-3" >
+                <div class="form-group" style="text-align: left">
+                    <button type="button" class="jv btn btn-primary " id="submit" ng-click="switchFave(true)">
+                        <span class="glyphicon glyphicon-search" aria-hidden="true"></span>
+                        Get Quote
+                    </button>
+                    <button type="button" id="clear" class="jv btn btn-default " ng-click="switchFave(false)" disabled="disabled">
+                        <span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
+                        Clear
+                    </button>
+                </div>
+
+            </div>
+            <!--<input type="submit" class="btn btn-primary" name="submit" placeholder="Get Quote">-->
+        </form>
+
+    </div>
+</div>
+<div class="container" style="background-color: white;margin-top: 20px;height: 1px;margin-bottom:20px">
+
+</div>
+
+
+<div id="fave" class="container" style="background-color: white;border-radius: 7px; ">
+    <div class="panel panel-default fave" ng-hide="hideFave" style="margin-top: 25px">
+        <div class="panel-heading" style="height: 50px">
+            <span style="font-weight: bold;float: left">Favorite List</span>
+            <span class="switch" style="float: right">
+                    <span style="margin-right: 5px" class="hidden-xs">Automatic Refresh:</span>
+                    <input data-toggle="toggle" type="checkbox" id="auto"/>
+                    <button type="button"  class=" btn btn-default " id="refresh" style="margin-left: 10px">
+                        <span class="glyphicon glyphicon-refresh" aria-hidden="true"></span>
+                    </button>
+                    <button type="button" ng-click = "hideFave = !hideFave" class=" btn btn-default " id="forward" >
+                        <span class="glyphicon glyphicon-chevron-right" aria-hidden="true"></span>
+                    </button>
+                </span>
+        </div>
+        <div class="panel-body">
+
+            <form class="form-inline">
+                <div class="row">
+                    <div class="col-md-1" style="margin-left: 3%;vertical-align: middle;text-align: center">
+                        <!--<div class="form-group">-->
+                        <p style="font-weight: bold;float: left;height: 40px;vertical-align: middle;padding-top: 8px">Sort by</p>
+                    </div>
+                    <div class="col-md-2" style="margin-left: 3%;margin-right: 3%">
+                        <select id="select1" style="width: 100%;height: 40px;float: left" onchange="selectChange()">
+                            <option selected>Default</option>
+                            <option>Symbol</option>
+                            <option>Price</option>
+                            <option>Change</option>
+                            <option>Change Percent</option>
+                            <option>Volume</option>
+                        </select>
+                        <!--</div>-->
+                    </div>
+                    <div class="col-md-1" style="margin-left: 3%;vertical-align: middle">
+                        <p style="font-weight: bold;float: left;vertical-align: middle;height: 40px;padding-top: 8px">Order</p>
+                    </div>
+                    <div class="col-md-2" style="margin-left: 3%;margin-right: 3%" >
+                        <select id="select2" style="width: 100%;height: 40px;float: left"  onchange="selectChange()">
+                            <option selected>Ascending</option>
+                            <option>Descending</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+
+                    </div>
+                </div>
+            </form>
+
+            <div class="row" style="margin-top: 10px;">
+                <table class="table table-striped" id="favetable">
+                    <tr>
+                        <td class="col-sm-2"><span style="font-weight: bold">Symbol</span></td>
+                        <td class="col-sm-2"><span style="font-weight: bold">Stock Price</span></td>
+                        <td class="col-sm-2"><span style="font-weight: bold">Change (Change Percent)</span></td>
+                        <td class="col-sm-2"><span style="font-weight: bold">Volume</span></td>
+                        <td class="col-sm-2"><span style="font-weight: bold"></span></td>
+                    </tr>
+
+                </table>
+            </div>
+
+        </div>
+
+
+
+    </div>
+</div>
+
+<div id="stockdetails" class="container" style="background-color: white;border-radius: 7px; ">
+    <div class="panel panel-default stockDetail" ng-show = "hideFave" style="margin-top: 25px">
+        <div class="panel-heading" style="height: 50px">
+            <button type="button" ng-click = "hideFave = !hideFave" class=" btn btn-default " id="backward" name="back" style="float:left;">
+                <span class="glyphicon glyphicon-chevron-left" aria-hidden="true"></span>
+            </button>
+            <span style="font-weight: bold;">Stock Details</span>
+        </div>
+
+        <div class="panel-body">
+            <ul class="nav nav-pills" id="navs">
+
+                <li class="active"  id="l1">
+                    <a class="nav-link active" href="#currentstock" data-toggle="pill" >
+                        <span class="glyphicon glyphicon-dashboard" aria-hidden="true"></span>
+                        <span class="hidden-xs"> Current Stock</span>
+                        <span class="visible-xs"> Stock</span>
+                    </a>
+                </li>
+                <li id="l2">
+                    <a class="nav-link" data-toggle="pill" href="#history">
+                        <span class="glyphicon glyphicon-stats" aria-hidden="true"></span>
+                        <span class="hidden-xs"> Historical Charts</span>
+                        <span class="visible-xs"> Charts</span>
+                    </a>
+                </li>
+                <li id="l3">
+                    <a class="nav-link" data-toggle="pill" href="#newstab">
+                        <span class="glyphicon glyphicon-link" aria-hidden="true"></span>
+                        <span class="hidden-xs"> News Feeds</span>
+                        <span class="visible-xs"> News</span>
+                    </a>
+                </li>
+            </ul>
+            <hr style="padding-bottom: 10px">
+            <div class="tab-content">
+
+                <div class="tab-pane fade in active" id="currentstock" style="background-color: white;margin-top: 10px">
+                    <div class="row">
+                        <div class="col-md-6" style="padding-right: 30px;margin-top: -20px;padding-bottom: 50px;">
+                            <div class="row" id="special" style="padding-bottom: 50px">
+                                <label style="float:left;margin-left: 30px">Stock Details</label>
+
+                                <div class="form-group" style="float:right;margin-right: 10px" >
+                                    <button id="starbtn" type="button" class=" btn btn-default " onclick="changeStar()" disabled>
+                                        <span class="glyphicon glyphicon-star-empty" id="star" aria-hidden="true" ></span>
+                                    </button>
+                                    <button id="fbbtn" type="button" class=" btn btn-default " disabled>
+                                        <img width="20px" height="20px"  src="http://cs-server.usc.edu:45678/hw/hw8/images/facebook.png">
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="pad" style="padding-bottom: 50px;padding-top: 100px"></div>
+
+                            <div class="progress" style="display:none;margin-left: 10px">
+                                <div class="progress" >
+                                    <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="45"
+                                         aria-valuemin="0" aria-valuemax="100" style="width: 50%">
+
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div id="stockall" style="display: none">
+                                <div class="alert alert-danger" role="alert" id="stockerr" style="margin-top: 53px;margin-left: 15px">
+                                    <span class="sr-only">Error:</span>
+                                    Error! Failed to get current stock data.
+                                </div>
+                                <table id="stocktable" class="table table-striped" style="display: none;height: 400px;margin-left: 10px;">
+                                    <tr >
+                                        <td style="text-align: left;"><span style="font-weight: bold;">Stock Ticker Symbol</span></td>
+                                        <td style="text-align: left" id="sts"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: left"><span style="font-weight: bold;">Last Price</span></td>
+                                        <td style="text-align: left" id="lp"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: left"><span style="font-weight: bold;">Change (Change Percent)</span></td>
+                                        <td style="text-align: left" id="cg"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: left"><span style="font-weight: bold;">Timestamp</span></td>
+                                        <td style="text-align: left" id="ts"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: left"><span style="font-weight: bold;">Open</span></td>
+                                        <td style="text-align: left" id="op"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: left"><span style="font-weight: bold;">Previous Close</span></td>
+                                        <td style="text-align: left" id="pc"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: left"><span style="font-weight: bold;">Day's Range</span></td>
+                                        <td style="text-align: left" id="dr"></td>
+                                    </tr>
+                                    <tr>
+                                        <td style="text-align: left"><span style="font-weight: bold;">Volume</span></td>
+                                        <td style="text-align: left" id="vo"></td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                        <!--<div class="col-md-1"><br><br><br><br><br><br><br><br></div>-->
+                        <div class="col-md-6" style="padding-left: 30px;margin-top: -20px">
+                            <div>
+
+                                <ul class="nav nav-tabs" id="inds">
+                                    <li role="presentation" class="active" id="price"><a style="cursor: pointer" >Price</a></li>
+                                    <li role="presentation" id="sma"><a style="cursor: pointer">SMA</a></li>
+                                    <li role="presentation" id="ema"><a style="cursor: pointer">EMA</a></li>
+                                    <li role="presentation" id="stoch"><a style="cursor: pointer">STOCH</a></li>
+                                    <li role="presentation" id="rsi"><a style="cursor: pointer">RSI</a></li>
+                                    <li role="presentation" id="adx"><a style="cursor: pointer">ADX</a></li>
+                                    <li role="presentation" id="cci"><a style="cursor: pointer">CCI</a></li>
+                                    <li role="presentation" id="bbands"><a style="cursor: pointer">BBANDS</a></li>
+                                    <li role="presentation" id="macd"><a style="cursor: pointer">MACD</a></li>
+                                </ul>
+
+                            </div>
+                            <div class="pad" style="padding-bottom: 100px;padding-top: 80px"></div>
+                            <div class="progress" id="indicatorprogress" style="display:none;margin-top: 67px;margin-right: 10px;margin-bottom: 100px">
+                                <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="45"
+                                     aria-valuemin="0" aria-valuemax="100" style="width: 50%">
+
+                                </div>
+                            </div>
+
+                            <div id="chartcontainer" style="display: none">
+
+                                <div id="priceall">
+                                    <div id='pricechart' style="display: none"></div>
+                                    <div class="alert alert-danger" role="alert" id="priceerr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get price data.
+                                    </div>
+                                </div>
+                                <div id="smaall" style="display: none">
+                                    <div id='smachart' style="display: none" ></div>
+                                    <div class="alert alert-danger" role="alert" id="smaerr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get sma data.
+                                    </div>
+                                </div>
+                                <div id="emaall" style="display: none">
+                                    <div id='emachart' style="display: none" ></div>
+                                    <div class="alert alert-danger" role="alert" id="emaerr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get ema data.
+                                    </div>
+                                </div>
+                                <div id="stochall" style="display: none">
+                                    <div id='stochchart' style="display: none" ></div>
+                                    <div class="alert alert-danger" role="alert" id="stocherr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get stoch data.
+                                    </div>
+                                </div>
+
+                                <div id="rsiall" style="display: none">
+                                    <div id='rsichart' style="display: none" ></div>
+                                    <div class="alert alert-danger" role="alert" id="rsierr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get rsi data.
+                                    </div>
+                                </div>
+                                <div id="adxall" style="display: none">
+                                    <div id='adxchart' style="display: none" ></div>
+                                    <div class="alert alert-danger" role="alert" id="adxerr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get adx data.
+                                    </div>
+                                </div>
+                                <div id="cciall" style="display: none">
+                                    <div id='ccichart' style="display: none" ></div>
+                                    <div class="alert alert-danger" role="alert" id="ccierr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get cci data.
+                                    </div>
+                                </div>
+                                <div id="bbandsall" style="display: none">
+                                    <div id='bbandschart' style="display: none" ></div>
+                                    <div class="alert alert-danger" role="alert" id="bbandserr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get bbands data.
+                                    </div>
+                                </div>
+
+
+                                <div id="macdall" style="display: none">
+                                    <div id='macdchart' style="display: none"></div>
+                                    <div class="alert alert-danger" role="alert" id="macderr" style="display: none">
+                                        <span class="sr-only">Error:</span>
+                                        Error! Failed to get macd data.
+                                    </div>
+                                </div>
+                            </div>
+
+
+                        </div>
+                    </div>
+                </div>
+
+
+
+                <div class="tab-pane fade" id="history" >
+                    <div class="progress" style="display:none;margin-top: 150px;margin-right: 10px;margin-bottom: 100px;margin-left: 10px">
+                        <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="45"
+                             aria-valuemin="0" aria-valuemax="100" style="width: 50%">
+
+                        </div>
+                    </div>
+                    <div class="alert alert-danger" role="alert" id="historyerr">
+                        <span class="sr-only">Error:</span>
+                        Error! Failed to get historical charts data.
+                    </div>
+
+                    <div id="historyinner" style="display: none">
+
+                    </div>
+                </div>
+
+
+
+                <div class="tab-pane fade" id="newstab" style="margin-top: -10px;margin-bottom: 10px;">
+                    <div class="progress" style="display:none;margin-top: 150px;margin-right: 10px;margin-bottom: 100px;margin-left: 10px">
+                        <div class="progress-bar progress-bar-striped active" role="progressbar" aria-valuenow="45"
+                             aria-valuemin="0" aria-valuemax="100" style="width: 50%">
+
+                        </div>
+                    </div>
+                    <div class="alert alert-danger" role="alert" id="newserr">
+                        <span class="sr-only">Error:</span>
+                        Error! Failed to get news feed data.
+                    </div>
+                    <div id="newstabinner" style="display: none">
+
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+
+
+
+
+    </div>
+
+
+</div>
+
+
+
+
+
+</body>
+</html>
